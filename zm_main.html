@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+    <title>琢磨</title>
+    <style>
+        *{
+            margin: 0;
+            padding: 0;
+        }
+    </style>
+    <script>
+        let target = document.documentElement || document.body;
+        let targetWidth = window.innerWidth || target.clientWidth;
+        target.style.fontSize = targetWidth / 750 * 100 + 'px';
+    </script>
+</head>
+
+<body>
+    <div id="stage" style="height:300px;"></div>
+    <!-- <script type="text/javascript" src="__JS__/spritejs.min.js"></script> -->
+    <script src="spritejs.min.js"></script>
+    <!-- <script src="https://cdn-ptimg-oss.yfway.com/showhome/activity/js/jweixin-1.3.2.js"></script> -->
+    <script>
+        const {Scene, Sprite,Arc} = spritejs;
+        var globalCanvasData = {}
+        
+        const container = document.querySelector('#stage');
+        const scene = new Scene({container, width: 600, height: 600});
+
+        const layer = scene.layer();
+        globalCanvasData.layer = layer
+        let editableAreaData = {
+            marginLeft:10,
+            marginTop:50
+        }
+        // 操作区初始参数
+        let operateAreaInit = {
+            width:200,
+            height:200,
+            posX:30,
+            posY:60,
+            borderWidth:1,
+            borderColor:'rgba(255,138,94,1)',
+            pointColor:'rgba(255,255,255,1)',
+            pointRadius:10
+        }
+        // 操作区的点初始参数
+        const pointInit = {
+            radius:operateAreaInit.pointRadius,
+            fillColor:operateAreaInit.pointColor,
+            strokeColor:operateAreaInit.borderColor,
+        }
+        // 操作区临时数据
+        let operateAreaData = {
+            left:null,
+            top:null,
+            minWidth:150,
+            minHeight:200
+        }
+        const Kit = {
+            init(){
+                // 背景图地址
+                let src =  'https://wsaiosscdn.yfway.com/hj/Uploads/Picture/2021/01/12/5ffd0a8de3d92.png'
+                // 绘制背景
+                Kit.drawBackground(src)
+                // 绘制可编辑区域
+                Kit.drawEditableArea()
+                // 绘制操作区域
+                Kit.drawOperateArea()
+                // 绘制当前图
+                Kit.drawCureentPicture()
+            },
+            // 绘制背景
+            drawBackground(src){
+                const canvasWidth = globalCanvasData.layer.options.width
+                const canvasHeight = globalCanvasData.layer.options.height
+                const background = new Sprite(src);
+                background.attr({
+                    pos: [0, 0],
+                    size:[canvasWidth,canvasHeight]
+                });
+                globalCanvasData.layer.append(background);
+                globalCanvasData.background = background
+            },
+            // 绘制可编辑区域
+            drawEditableArea(){
+                // 获取当前画布的宽 高 被小程序dpr缩放前的像素值
+                const canvasWidth = globalCanvasData.layer.options.width
+                const canvasHeight = globalCanvasData.layer.options.height
+                const editableAreaWidthSize = canvasWidth - (editableAreaData.marginLeft * 2)
+                const editableAreaHeightSize = canvasHeight - editableAreaData.marginTop - editableAreaData.marginLeft
+                const editableArea = new Sprite({
+                    size: [editableAreaWidthSize,editableAreaHeightSize],
+                    pos: [editableAreaData.marginLeft, editableAreaData.marginTop],
+                    border:[1,'rgba(0,0,0,1)']
+                });
+                globalCanvasData.layer.append(editableArea);
+                globalCanvasData.editableArea = editableArea
+            },
+            // 绘制操作区域
+            drawOperateArea(){
+                let operateArea = new Sprite({
+                    width:operateAreaInit.width,
+                    height:operateAreaInit.height,
+                    pos: [operateAreaInit.posX,operateAreaInit.posY],
+                    border:[operateAreaInit.borderWidth,operateAreaInit.borderColor]
+                });
+                operateArea.addEventListener('touchstart',(e)=>{
+                    Kit.operateAreaTouchStart(e)
+                })
+                operateArea.addEventListener('touchmove',(e)=>{
+                    Kit.operateAreaTouchMove(e)
+                })
+                operateArea.addEventListener('touchend',(e)=>{
+                    Kit.operateAreaTouchEnd(e)
+                })
+                globalCanvasData.layer.append(operateArea);
+                // 绘制操作四角的点
+                // 左上角
+                const operateAreaLeftTopPoint = new Arc({
+                    radius:pointInit.radius,
+                    fillColor:pointInit.fillColor,
+                    strokeColor:pointInit.strokeColor,
+                    pos: [operateAreaInit.posX,operateAreaInit.posY],
+                })
+                operateAreaLeftTopPoint.addEventListener('touchmove',(e)=>{
+                    let newOperateArea = {
+                        posX:globalCanvasData.operateArea.attributes.x,
+                        posY:globalCanvasData.operateArea.attributes.y,
+                        width:globalCanvasData.operateArea.attributes.width,
+                        height:globalCanvasData.operateArea.attributes.height,
+                        posX2:globalCanvasData.operateArea.attributes.x + globalCanvasData.operateArea.attributes.width,
+                        posY2:globalCanvasData.operateArea.attributes.y + globalCanvasData.operateArea.attributes.height,
+                    }
+                    // x,y的边缘判断
+                    if(e.x <= globalCanvasData.editableArea.attributes.x){
+                        newOperateArea.posX = globalCanvasData.editableArea.attributes.x
+                    }else if(e.x >= newOperateArea.posX2 - (pointInit.radius*2)){
+                        newOperateArea.posX = newOperateArea.posX2 - (pointInit.radius*2)
+                    }else{
+                        newOperateArea.posX = e.x
+                    }
+                    if(e.y <= globalCanvasData.editableArea.attributes.y){
+                        newOperateArea.posY = globalCanvasData.editableArea.attributes.y
+                    }else if(e.y >= newOperateArea.posY2 - (pointInit.radius*2)){
+                        newOperateArea.posY = newOperateArea.posY2 - (pointInit.radius*2)
+                    }else{
+                        newOperateArea.posY = e.y
+                    }
+                    this.setOperateAreaState(newOperateArea)
+                })
+                operateAreaLeftTopPoint.addEventListener('touchend',(e)=>{
+                    Kit.operateAreaTouchEnd()
+                })
+                globalCanvasData.layer.append(operateAreaLeftTopPoint);
+                // 右上角
+                const operateAreaRightTopPoint = new Arc({
+                    radius:pointInit.radius,
+                    fillColor:pointInit.fillColor,
+                    strokeColor:pointInit.strokeColor,
+                    pos: [operateAreaInit.posX + operateAreaInit.width,operateAreaInit.posY],
+                })
+                operateAreaRightTopPoint.addEventListener('touchmove',(e)=>{
+                    let newOperateArea = {
+                        posX:globalCanvasData.operateArea.attributes.x,
+                        posY:globalCanvasData.operateArea.attributes.y,
+                        width:globalCanvasData.operateArea.attributes.width,
+                        height:globalCanvasData.operateArea.attributes.height,
+                        posX2:globalCanvasData.operateArea.attributes.x + globalCanvasData.operateArea.attributes.width,
+                        posY2:globalCanvasData.operateArea.attributes.y + globalCanvasData.operateArea.attributes.height,
+                    }
+                    // x,y的边缘判断
+                    if(e.x <= globalCanvasData.operateArea.attributes.x + (pointInit.radius*2)){
+                        newOperateArea.posX2 = globalCanvasData.operateArea.attributes.x + (pointInit.radius*2)
+                    }else if(e.x >= globalCanvasData.editableArea.attributes.x + globalCanvasData.editableArea.attributes.width){
+                        newOperateArea.posX2 = globalCanvasData.editableArea.attributes.x + globalCanvasData.editableArea.attributes.width
+                    }else{
+                        newOperateArea.posX2 = e.x
+                    }
+                    if(e.y <= globalCanvasData.editableArea.attributes.y){
+                        newOperateArea.posY = globalCanvasData.editableArea.attributes.y
+                    }else if(e.y >= newOperateArea.posY2 - (pointInit.radius*2)){
+                        newOperateArea.posY = newOperateArea.posY2 - (pointInit.radius*2)
+                    }else{
+                        newOperateArea.posY = e.y
+                    }
+                    this.setOperateAreaState(newOperateArea)
+                })
+                operateAreaRightTopPoint.addEventListener('touchend',(e)=>{
+                    Kit.operateAreaTouchEnd()
+                })
+                globalCanvasData.layer.append(operateAreaRightTopPoint);
+                // 左下角
+                const operateAreaLeftBottomPoint = new Arc({
+                    radius:pointInit.radius,
+                    fillColor:pointInit.fillColor,
+                    strokeColor:pointInit.strokeColor,
+                    pos: [operateAreaInit.posX,operateAreaInit.posY + operateAreaInit.height],
+                })
+                operateAreaLeftBottomPoint.addEventListener('touchmove',(e)=>{
+                    let newOperateArea = {
+                        posX:globalCanvasData.operateArea.attributes.x,
+                        posY:globalCanvasData.operateArea.attributes.y,
+                        width:globalCanvasData.operateArea.attributes.width,
+                        height:globalCanvasData.operateArea.attributes.height,
+                        posX2:globalCanvasData.operateArea.attributes.x + globalCanvasData.operateArea.attributes.width,
+                        posY2:globalCanvasData.operateArea.attributes.y + globalCanvasData.operateArea.attributes.height,
+                    }
+                    // x,y的边缘判断
+                    if(e.x <= globalCanvasData.editableArea.attributes.x){
+                        newOperateArea.posX = globalCanvasData.editableArea.attributes.x
+                    }else if(e.x >= newOperateArea.posX2 - (pointInit.radius*2)){
+                        newOperateArea.posX = newOperateArea.posX2 - (pointInit.radius*2)
+                    }else{
+                        newOperateArea.posX = e.x
+                    }
+                    if(e.y <= globalCanvasData.operateArea.attributes.y + (pointInit.radius*2)){
+                        newOperateArea.posY2 = globalCanvasData.operateArea.attributes.y + (pointInit.radius*2)
+                    }else if(e.y >= globalCanvasData.editableArea.attributes.y + globalCanvasData.editableArea.attributes.height){
+                        newOperateArea.posY2 = globalCanvasData.editableArea.attributes.y + globalCanvasData.editableArea.attributes.height
+                    }else{
+                        newOperateArea.posY2 = e.y
+                    }
+                    this.setOperateAreaState(newOperateArea)
+                })
+                operateAreaLeftBottomPoint.addEventListener('touchend',(e)=>{
+                    Kit.operateAreaTouchEnd()
+                })
+                globalCanvasData.layer.append(operateAreaLeftBottomPoint);
+                // 右下角
+                const operateAreaRightBottomPoint = new Arc({
+                    radius:pointInit.radius,
+                    fillColor:pointInit.fillColor,
+                    strokeColor:pointInit.strokeColor,
+                    pos: [operateAreaInit.posX + operateAreaInit.width,operateAreaInit.posY + operateAreaInit.height],
+                })
+                operateAreaRightBottomPoint.addEventListener('touchmove',(e)=>{
+                    let newOperateArea = {
+                        posX:globalCanvasData.operateArea.attributes.x,
+                        posY:globalCanvasData.operateArea.attributes.y,
+                        width:globalCanvasData.operateArea.attributes.width,
+                        height:globalCanvasData.operateArea.attributes.height,
+                        posX2:globalCanvasData.operateArea.attributes.x + globalCanvasData.operateArea.attributes.width,
+                        posY2:globalCanvasData.operateArea.attributes.y + globalCanvasData.operateArea.attributes.height,
+                    }
+                    // x,y的边缘判断
+                    if(e.x <= globalCanvasData.operateArea.attributes.x + (pointInit.radius*2)){
+                        newOperateArea.posX2 = globalCanvasData.operateArea.attributes.x + (pointInit.radius*2)
+                    }else if(e.x >= globalCanvasData.editableArea.attributes.x + globalCanvasData.editableArea.attributes.width){
+                        newOperateArea.posX2 = globalCanvasData.editableArea.attributes.x + globalCanvasData.editableArea.attributes.width
+                    }else{
+                        newOperateArea.posX2 = e.x
+                    }
+                    if(e.y <= globalCanvasData.operateArea.attributes.y + (pointInit.radius*2)){
+                        newOperateArea.posY2 = globalCanvasData.operateArea.attributes.y + (pointInit.radius*2)
+                    }else if(e.y >= globalCanvasData.editableArea.attributes.y + globalCanvasData.editableArea.attributes.height){
+                        newOperateArea.posY2 = globalCanvasData.editableArea.attributes.y + globalCanvasData.editableArea.attributes.height
+                    }else{
+                        newOperateArea.posY2 = e.y
+                    }
+                    this.setOperateAreaState(newOperateArea)
+                })
+                operateAreaRightBottomPoint.addEventListener('touchend',(e)=>{
+                    Kit.operateAreaTouchEnd()
+                })
+                globalCanvasData.layer.append(operateAreaRightBottomPoint);
+
+                globalCanvasData.operateArea = operateArea
+                globalCanvasData.operateAreaLeftTopPoint = operateAreaLeftTopPoint
+                globalCanvasData.operateAreaRightTopPoint = operateAreaRightTopPoint
+                globalCanvasData.operateAreaLeftBottomPoint = operateAreaLeftBottomPoint
+                globalCanvasData.operateAreaRightBottomPoint = operateAreaRightBottomPoint
+            },
+            setOperateAreaState(newOperateArea){
+                // 设置operateArea操作区宽高
+                newOperateArea.width = newOperateArea.posX2 - newOperateArea.posX
+                newOperateArea.height = newOperateArea.posY2 - newOperateArea.posY
+                globalCanvasData.operateArea.attr('size',[newOperateArea.width,newOperateArea.height])
+                globalCanvasData.operateArea.attr('pos', [newOperateArea.posX,newOperateArea.posY])
+                // 改变操作区点位置
+                globalCanvasData.operateAreaLeftTopPoint.attr('pos',[newOperateArea.posX,newOperateArea.posY])
+                globalCanvasData.operateAreaRightTopPoint.attr('pos',[newOperateArea.posX2,newOperateArea.posY])
+                globalCanvasData.operateAreaLeftBottomPoint.attr('pos',[newOperateArea.posX,newOperateArea.posY2])
+                globalCanvasData.operateAreaRightBottomPoint.attr('pos',[newOperateArea.posX2,newOperateArea.posY2])
+                globalCanvasData.currentPicture.attr('texture',null)
+                globalCanvasData.currentPicture.attr('pos',[newOperateArea.posX + pointInit.radius,newOperateArea.posY + pointInit.radius])
+            },
+            // 操作区tap 记录当前点击的x,y
+            operateAreaTouchStart(e){
+                // 点击框内时，记录接触点距离操作区的左间距与顶间距
+                operateAreaData.left = e.x - globalCanvasData.operateArea.attributes.x
+                operateAreaData.top = e.y - globalCanvasData.operateArea.attributes.y
+            },
+            // 操作区移动事件
+            operateAreaTouchMove(e){
+                const _x = e.x - operateAreaData.left
+                const _y = e.y - operateAreaData.top
+                const _x2 = _x + globalCanvasData.operateArea.attributes.width
+                const _y2 = _y + globalCanvasData.operateArea.attributes.height
+                let newOperateArea = {
+                    posX:globalCanvasData.operateArea.attributes.x,
+                    posY:globalCanvasData.operateArea.attributes.y,
+                    width:globalCanvasData.operateArea.attributes.width,
+                    height:globalCanvasData.operateArea.attributes.height,
+                    posX2:globalCanvasData.operateArea.attributes.x + globalCanvasData.operateArea.attributes.width,
+                    posY2:globalCanvasData.operateArea.attributes.y + globalCanvasData.operateArea.attributes.height,
+                }
+                // x,y的边缘判断
+                if(_x <= globalCanvasData.editableArea.attributes.x){
+                    newOperateArea.posX = globalCanvasData.editableArea.attributes.x
+                    newOperateArea.posX2 = newOperateArea.posX + globalCanvasData.operateArea.attributes.width
+                }else if(_x2 >= globalCanvasData.editableArea.attributes.x + globalCanvasData.editableArea.attributes.width){
+                    newOperateArea.posX2 = globalCanvasData.editableArea.attributes.x + globalCanvasData.editableArea.attributes.width
+                    newOperateArea.posX = newOperateArea.posX2 - globalCanvasData.operateArea.attributes.width
+                }else{
+                    newOperateArea.posX = _x
+                    newOperateArea.posX2 = _x2
+                }
+                if(_y <= globalCanvasData.editableArea.attributes.y){
+                    newOperateArea.posY = globalCanvasData.editableArea.attributes.y
+                    newOperateArea.posY2 = newOperateArea.posY + globalCanvasData.operateArea.attributes.height
+                }else if(_y2 >= globalCanvasData.editableArea.attributes.y + globalCanvasData.editableArea.attributes.height){
+                    newOperateArea.posY2 = globalCanvasData.editableArea.attributes.y + globalCanvasData.editableArea.attributes.height
+                    newOperateArea.posY = newOperateArea.posY2 - globalCanvasData.operateArea.attributes.height
+                }else{
+                    newOperateArea.posY = _y
+                    newOperateArea.posY2 = _y2
+                }
+                this.setOperateAreaState(newOperateArea)
+            },
+            // 接触事件结束
+            operateAreaTouchEnd(){
+                Kit.drawCureentPicture()
+            },
+            drawCureentPicture(){
+                let src = null
+                if(globalCanvasData.operateArea.attributes.width < 200){
+                    src = "https://wsaiosscdn.yfway.com/hj/Uploads/Picture/2020/09/15/5f606d0ddd0fa.jpg"
+                }else{
+                    src = "https://wsaiosscdn.yfway.com/hj/Uploads/Picture/2020/09/15/5f606c746f15e.jpg"
+                }
+                let currentPicture = null
+                if(globalCanvasData.currentPicture){
+                    currentPicture = globalCanvasData.currentPicture
+                }else{
+                    currentPicture = new Sprite(src)
+                    globalCanvasData.layer.append(currentPicture)
+                    currentPicture.addEventListener('touchstart',(e)=>{
+                        Kit.operateAreaTouchStart(e)
+                    })
+                    currentPicture.addEventListener('touchmove',(e)=>{
+                        Kit.operateAreaTouchMove(e)
+                    })
+                    currentPicture.addEventListener('touchend',(e)=>{
+                        Kit.operateAreaTouchEnd(e)
+                    })
+                }
+                currentPicture.attr({
+                    texture: src,
+                    pos: [globalCanvasData.operateArea.attributes.x + pointInit.radius,globalCanvasData.operateArea.attributes.y + pointInit.radius],
+                    size:[globalCanvasData.operateArea.attributes.width - (pointInit.radius*2),globalCanvasData.operateArea.attributes.height - (pointInit.radius*2)]
+                })
+                globalCanvasData.currentPicture = currentPicture
+            }
+        }
+        Kit.init()
+    </script>
+</body>
+
+</html>
